@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Distributed DB GUI</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 90%;
+      max-width: 800px;
+      background: white;
+      padding: 30px;
+      margin-top: 40px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+      border-radius: 10px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    input {
+      padding: 10px;
+      margin: 5px 0;
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin-top: 10px;
+      margin-right: 10px;
+      background-color: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background-color: #1565c0;
+    }
+
+    pre {
+      background: #f5f5f5;
+      padding: 10px;
+      border-radius: 5px;
+      overflow: auto;
+    }
+
+    .section {
+      margin-bottom: 25px;
+    }
+
+    .node-status {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .node-btn {
+      flex: 1;
+      min-width: 180px;
+      margin: 5px;
+      padding: 12px;
+      text-align: center;
+      border-radius: 8px;
+      font-weight: bold;
+      background-color: #e0e0e0;
+      border: 2px solid #ccc;
+      cursor: pointer;
+    }
+
+    .node-btn.active {
+      background-color: #1976d2;
+      color: white;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .status-box {
+  padding: 5px;
+  border-radius: 4px;
+  margin-bottom: 5px;
+}
+
+.status-up {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-down {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-new-master {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Distributed Database Interface</h1>
+
+    <div class="node-status">
+      <button id="master" class="node-btn" onclick="selectNode('8001', true)">Master: Up (Port 8001)</button>
+      <button id="slave1" class="node-btn" onclick="selectNode('8002', false)">Slave 1: Up (Port 8002)</button>
+      <button id="slave2" class="node-btn" onclick="selectNode('8003', false)">Slave 2: Up (Port 8003)</button>
+    </div>
+
+    <div class="section" id="db-config">
+      <h2>Database Configuration</h2>
+      <input id="dbname" placeholder="Database Name">
+      <div>
+        <button onclick="createDB()">Create Database</button>
+        <button onclick="dropDB()">Drop Database</button>
+        <button onclick="connectDB()">Use Database</button>
+      </div>
+    </div>
+
+    <div class="section" id="table-create">
+      <h2>Create Table</h2>
+      <input id="table" placeholder="Table Name">
+      <input id="schema" placeholder="Schema e.g. id INT, name VARCHAR(50)">
+      <button onclick="createTable()">Create Table</button>
+    </div>
+
+    <div class="section">
+      <h2>Insert Record</h2>
+      <input id="insert_table" placeholder="Table">
+      <input id="insert_values" placeholder="Values e.g. '1', 'Ali'">
+      <button onclick="insert()">Insert</button>
+    </div>
+
+    <div class="section">
+      <h2>Select Records</h2>
+      <input id="select_table" placeholder="Table">
+      <button onclick="selectAll()">Select</button>
+      <h3>Results:</h3>
+      <pre id="results">No data yet...</pre>
+    </div>
+
+    <div class="section">
+      <h2>Update Record</h2>
+      <input id="update_table" placeholder="Table">
+      <input id="update_set" placeholder="Set clause e.g. name='Hamo'">
+      <input id="update_where" placeholder="Where clause e.g. id=1">
+      <button onclick="update()">Update</button>
+    </div>
+
+    <div class="section">
+      <h2>Delete Record</h2>
+      <input id="delete_table" placeholder="Table">
+      <input id="delete_where" placeholder="Where clause e.g. id=1">
+      <button onclick="deleteRec()">Delete</button>
+    </div>
+  </div>
+
+  <script>
+    let host = "http://localhost:8001";
+    let currentMasterPort = "8001";
+    let selectedPort = "8001";
+    let selectedIsMaster = true;
+    let dbname = '';
+
+    function selectNode(port, isMaster) {
+      selectedPort = port;
+      selectedIsMaster = isMaster;
+      host = `http://localhost:${port}`;
+
+      document.querySelectorAll('.node-btn').forEach(btn => btn.classList.remove('active'));
+      // const index = port === '8001' ? 0 : (port === '8002' ? 1 : 2);
+      document.getElementById(isMaster ? 'master' : port === '8002' ? 'slave1' : 'slave2')?.classList.add('active');
+
+
+      document.getElementById('db-config').style.display = isMaster ? 'block' : 'none';
+      document.getElementById('table-create').style.display = isMaster ? 'block' : 'none';
+    }
+
+    // Default selection
+    selectNode("8001", true);
+
+
+    function showAlert(message) {
+      alert(message);
+      console.log(message);
+    }
+
+    function updateNodeStatus() {
+        checkNodeStatus(currentMasterPort, 'master');
+        checkNodeStatus('8002', 'slave1');
+        checkNodeStatus('8003', 'slave2');
+
+    }
+
+    function findNewMaster() {
+      const slaves = [
+        {port: '8002', element: 'slave1'},
+        {port: '8003', element: 'slave2'}
+      ];
+      
+      let newMasterFound = false;
+      
+      slaves.forEach(slave => {
+        fetch(`http://localhost:${slave.port}/is-master`)
+          .then(response => {
+            if (response.ok) {
+              return response.json();
+            }
+            throw new Error("Not responding");
+          })
+          .then(data => {
+            if (data.isMaster && !newMasterFound) {
+              newMasterFound = true;
+              currentMasterPort = slave.port;
+              host = `http://localhost:${slave.port}`;
+              
+              // Update UI
+              document.getElementById('master').className = 'status-box status-down';
+              document.getElementById('master-status').textContent = 'Old Master: Down';
+              
+              const element = document.getElementById(slave.element);
+              element.className = 'status-box status-new-master';
+              element.textContent = `New Master: Up (Port ${slave.port})`;
+              
+              showAlert(`Master has switched to node on port ${slave.port}`);
+            }
+          })
+          .catch(err => {
+            console.error(`Error checking slave ${slave.port}:`, err);
+            const element = document.getElementById(slave.element);
+            element.className = 'status-box status-down';
+            element.textContent = `Slave ${slave.port.charAt(3)}: Down`;
+          });
+      });
+    }
+
+    
+    function checkNodeStatus(port, roleId) {
+    fetch(`http://localhost:${port}/ping`)
+        .then(response => {
+        if (response.ok) return response.text();
+        throw new Error("Not responding");
+        })
+        .then(text => {
+        const element = document.getElementById(roleId);
+        const btn = document.querySelector(`.node-btn[data-port="${port}"]`);
+        
+        if (text === "pong") {
+            element.className = 'node-btn status-box status-up';
+            element.textContent = port === currentMasterPort
+            ? `Master: Up (Port ${port})`
+            : `Slave ${port.charAt(3)-1}: Up (Port ${port})`;
+
+            // Update button text if found
+            if (btn) {
+            btn.textContent = element.textContent;
+            }
+        } else {
+            throw new Error("Invalid response");
+        }
+        })
+        .catch(error => {
+        console.error(`Error checking node ${port}:`, error);
+        const element = document.getElementById(roleId);
+        const btn = document.querySelector(`.node-btn[data-port="${port}"]`);
+
+        element.className = 'status-box status-down';
+        element.textContent = port === currentMasterPort
+            ? `Master: Down (Port ${port})`
+            : `Slave ${port.charAt(3)}: Down (Port ${port})`;
+
+        if (btn) {
+            btn.textContent = element.textContent;
+            btn.className = 'node-btn';
+        }
+        });
+    }
+
+    function createDB() {
+      const db = document.getElementById("dbname").value;
+      if (!db) {
+        showAlert("Please enter database name");
+        return;
+      }
+      fetch(`${host}/createdb?name=${db}`)
+        .then(res => res.text())
+        .then(showAlert)
+        .catch(err => showAlert("Error: " + err));
+    }
+
+    function dropDB() {
+      const db = document.getElementById("dbname").value;
+      if (!db) {
+        showAlert("Please enter database name");
+        return;
+      }
+      fetch(`${host}/dropdb?name=${db}`)
+        .then(res => res.text())
+        .then(showAlert)
+        .catch(err => showAlert("Error: " + err));
+    }
+
+    function createTable() {
+      const db = dbname;
+      const table = document.getElementById("table").value;
+      const schema = document.getElementById("schema").value;
+      
+      if (!db || !table || !schema) {
+        showAlert("Please fill all fields");
+        return;
+      }
+      
+      fetch(`${host}/createtable?dbname=${db}&table=${table}&schema=${encodeURIComponent(schema)}`)
+        .then(res => res.text())
+        .then(showAlert)
+        .catch(err => showAlert("Error: " + err));
+    }
+
+    function insert() {
+      const table = document.getElementById("insert_table").value;
+      const values = document.getElementById("insert_values").value;
+      
+      // if(!dbname){
+      //   showAlert("Please select the database first");
+      //   return;
+      // }
+
+      if (!table || !values) {
+        showAlert("Please fill all fields");
+        return;
+      }
+      
+      fetch(`${host}/insert`, {
+        method: "POST",
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ dbname, table, values })
+      })
+      .then(res => res.text())
+      .then(showAlert)
+      .catch(err => showAlert("Error: " + err));
+    }
+
+    function selectAll() {
+      const table = document.getElementById("select_table").value;
+      
+      // if(!dbname){
+      //   showAlert("Please select the database first");
+      //   return;
+      // }
+
+      if (!table) {
+        showAlert("Please fill all fields");
+        return;
+      }
+      
+      fetch(`${host}/select?dbname=${dbname}&table=${table}`)
+        .then(res => {
+          if (!res.ok) throw new Error(res.statusText);
+          return res.json();
+        })
+        .then(data => {
+          document.getElementById("results").innerText = JSON.stringify(data, null, 2);
+        })
+        .catch(err => {
+          document.getElementById("results").innerText = "Error: " + err.message;
+        });
+    }
+
+    function update() {
+      const table = document.getElementById("update_table").value;
+      const set = document.getElementById("update_set").value;
+      const where = document.getElementById("update_where").value;
+      
+      // if(!dbname){
+      //   showAlert("Please select the database first");
+      //   return;
+      // }
+
+      if (!table || !set || !where) {
+        showAlert("Please fill all fields");
+        return;
+      }
+      
+      fetch(`${host}/update`, {
+        method: "POST",
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ dbname, table, set, where })
+      })
+      .then(res => res.text())
+      .then(showAlert)
+      .catch(err => showAlert("Error: " + err));
+    }
+
+    function deleteRec() {
+      const table = document.getElementById("delete_table").value;
+      const where = document.getElementById("delete_where").value;
+      
+      // if(!dbname){
+      //   showAlert("Please select the database first");
+      //   return;
+      // }
+
+      if (!table || !where) {
+        showAlert("Please fill all fields");
+        return;
+      }
+      
+      fetch(`${host}/delete`, {
+        method: "POST",
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ dbname, table, where })
+      })
+      .then(res => res.text())
+      .then(showAlert)
+      .catch(err => showAlert("Error: " + err));
+    }
+
+    function connectDB(){
+      const db = document.getElementById('dbname').value;
+      if (!db) {
+        showAlert("Please enter database name to connect.");
+        return;
+      }
+      dbname = db;
+      showAlert("Database selected to be used!")
+    }
+    window.onload = updateNodeStatus;
+  </script>
+</body>
+</html>
