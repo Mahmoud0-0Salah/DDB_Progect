@@ -2,7 +2,7 @@
 
 ![Status](https://img.shields.io/badge/status-active-brightgreen)
 ![Language](https://img.shields.io/badge/language-Go-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+
 
 ## 📋 Overview
 
